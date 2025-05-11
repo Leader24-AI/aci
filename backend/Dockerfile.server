@@ -8,20 +8,24 @@ RUN uv sync --all-extras --no-install-project
 
 ENV PATH="/workdir/.venv/bin:$PATH"
 
-# Check if PYTHONPATH exists and append /workdir, otherwise set it to /workdir
-RUN if [ -z "$PYTHONPATH" ]; then export PYTHONPATH=/workdir; else export PYTHONPATH=/workdir:$PYTHONPATH; fi
+# Assicura che PYTHONPATH includa /workdir
+RUN if [ -z "$PYTHONPATH" ]; then \
+      export PYTHONPATH=/workdir; \
+    else \
+      export PYTHONPATH=/workdir:$PYTHONPATH; \
+    fi
 
-# .env files will be skipped by default specified in .dockerignore
+# Copia solo il codice, saltando .env (gestiti fuori dal container)
 COPY ./aci/server /workdir/aci/server
 COPY ./aci/common /workdir/aci/common
 COPY ./aci/__init__.py /workdir/aci/__init__.py
 
-# remove unecessary or sensitive files (.env files are skipped by default specified in .dockerignore)
+# Rimuovi test e file sensibili
 RUN rm -rf /workdir/aci/server/tests
 
-CMD ["uvicorn", "aci.server.main:app", "--proxy-headers", "--forwarded-allow-ips=*", "--host", "0.0.0.0", "--port", "8000"]
-# esponi la porta 8000 a Traefik
+# Espone la porta 8000 per Traefik / HTTP
 EXPOSE 8000
 
-# comando di startup: avvia FastAPI con uvicorn
-CMD ["uvicorn", "aci.server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Avvia FastAPI con Uvicorn
+CMD ["uvicorn", "aci.server.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips=*"]
