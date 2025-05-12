@@ -1,4 +1,6 @@
 FROM python:3.12
+
+# Copio l’eseguibile di uv (più veloce di pip)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /workdir
@@ -7,25 +9,16 @@ COPY ./pyproject.toml ./uv.lock /workdir/
 RUN uv sync --all-extras --no-install-project
 
 ENV PATH="/workdir/.venv/bin:$PATH"
+ENV PYTHONPATH="/workdir"
 
-# Assicura che PYTHONPATH includa /workdir
-RUN if [ -z "$PYTHONPATH" ]; then \
-      export PYTHONPATH=/workdir; \
-    else \
-      export PYTHONPATH=/workdir:$PYTHONPATH; \
-    fi
-
-# Copia solo il codice, saltando .env (gestiti fuori dal container)
-COPY ./aci/server /workdir/aci/server
-COPY ./aci/common /workdir/aci/common
+# Copia solo il codice (i .env sono esclusi da .dockerignore)
+COPY ./aci/server  /workdir/aci/server
+COPY ./aci/common  /workdir/aci/common
 COPY ./aci/__init__.py /workdir/aci/__init__.py
 
-# Rimuovi test e file sensibili
+# Elimina i test
 RUN rm -rf /workdir/aci/server/tests
 
-# Espone la porta 8000 per Traefik / HTTP
+# Uvicorn in ascolto
 EXPOSE 8000
-
-# Avvia FastAPI con Uvicorn
-CMD ["uvicorn", "aci.server.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--proxy-headers", "--forwarded-allow-ips=*"]
+CMD ["uvicorn", "aci.server.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
